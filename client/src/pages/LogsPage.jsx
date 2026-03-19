@@ -13,7 +13,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { ChevronLeft, ChevronRight, History, QrCode, TrendingUp, Download } from "lucide-react";
+import { ChevronLeft, ChevronRight, History, QrCode, TrendingUp, Download, SlidersHorizontal, X } from "lucide-react";
 
 export default function LogsPage() {
   const { isCHOAdmin, isCHOMonitor } = useAuth();
@@ -37,6 +37,8 @@ export default function LogsPage() {
   const [loadingRecords, setLoadingRecords] = useState(false);
   const [loadingForecast, setLoadingForecast] = useState(false);
   const [exportingLogs, setExportingLogs] = useState(false);
+
+  const hasActiveFilters = selectedCenter !== "all" || actionFilter !== "all" || startDate || endDate;
 
   useEffect(() => {
     if (isCHOAdmin || isCHOMonitor) {
@@ -120,6 +122,20 @@ export default function LogsPage() {
     return "secondary";
   };
 
+  const formatStamp = (value) => new Date(value).toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
+  const clearFilters = () => {
+    setSelectedCenter("all");
+    setActionFilter("all");
+    setStartDate("");
+    setEndDate("");
+  };
+
   const handleExportLogsPDF = async () => {
     setExportingLogs(true);
     try {
@@ -145,18 +161,29 @@ export default function LogsPage() {
   };
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4 md:space-y-5">
       <div>
         <h1 className="text-[22px] font-bold text-foreground tracking-tight">Logs</h1>
         <p className="text-sm text-muted-foreground mt-0.5">Permanent audit trail, QR dispensing records, and 60-day usage forecast</p>
       </div>
 
-      <Card className="!shadow-none border border-border/60">
-        <CardContent className="p-4">
-          <div className="flex flex-wrap items-center gap-3">
+      <Card className="!shadow-none border border-emerald-100 bg-gradient-to-br from-white to-emerald-50/40">
+        <CardContent className="p-4 space-y-3">
+          <div className="flex items-center justify-between gap-2">
+            <p className="inline-flex items-center gap-2 text-[12px] font-semibold uppercase tracking-wider text-emerald-800/80">
+              <SlidersHorizontal className="w-3.5 h-3.5" /> Filters
+            </p>
+            {hasActiveFilters && (
+              <Button variant="ghost" size="sm" className="h-8 gap-1.5 text-xs" onClick={clearFilters}>
+                <X className="w-3.5 h-3.5" /> Clear
+              </Button>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-[220px_190px_150px_150px_1fr] gap-3">
             {(isCHOAdmin || isCHOMonitor) && (
               <Select value={selectedCenter} onValueChange={setSelectedCenter}>
-                <SelectTrigger className="w-[220px] h-10">
+                <SelectTrigger className="w-full h-10">
                   <SelectValue placeholder="All Centers" />
                 </SelectTrigger>
                 <SelectContent>
@@ -168,7 +195,7 @@ export default function LogsPage() {
               </Select>
             )}
             <Select value={actionFilter} onValueChange={setActionFilter}>
-              <SelectTrigger className="w-[190px] h-10">
+              <SelectTrigger className="w-full h-10">
                 <SelectValue placeholder="All Actions" />
               </SelectTrigger>
               <SelectContent>
@@ -181,15 +208,15 @@ export default function LogsPage() {
                 <SelectItem value="MEDICINE_UPDATED">Medicine Updated</SelectItem>
               </SelectContent>
             </Select>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 rounded-lg bg-white/90 border border-border/60 px-2.5">
               <Label className="text-xs text-muted-foreground">From</Label>
-              <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-[150px] h-10" />
+              <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full h-10 border-0 shadow-none p-0" />
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 rounded-lg bg-white/90 border border-border/60 px-2.5">
               <Label className="text-xs text-muted-foreground">To</Label>
-              <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-[150px] h-10" />
+              <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full h-10 border-0 shadow-none p-0" />
             </div>
-            <Button onClick={handleExportLogsPDF} variant="outline" className="h-10 gap-2 ml-auto" disabled={exportingLogs}>
+            <Button onClick={handleExportLogsPDF} variant="outline" className="h-10 gap-2 w-full sm:w-auto sm:ml-auto" disabled={exportingLogs}>
               <Download className="w-4 h-4" /> {exportingLogs ? "Exporting..." : "Export Logs PDF"}
             </Button>
           </div>
@@ -197,7 +224,7 @@ export default function LogsPage() {
       </Card>
 
       <Tabs defaultValue="audit" className="space-y-4">
-        <TabsList className="bg-muted/60 p-1 rounded-lg">
+        <TabsList className="bg-muted/60 p-1 rounded-xl grid w-full grid-cols-3 h-auto">
           <TabsTrigger value="audit" className="gap-2 text-[13px] rounded-md data-[state=active]:shadow-sm">
             <History className="w-3.5 h-3.5" /> Audit Trail
           </TabsTrigger>
@@ -217,32 +244,52 @@ export default function LogsPage() {
               ) : auditLogs.length === 0 ? (
                 <div className="text-center py-16 text-sm text-muted-foreground">No audit activity found.</div>
               ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow className="hover:bg-transparent">
-                      <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground">Date/Time</TableHead>
-                      <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground">Action</TableHead>
-                      <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground">Description</TableHead>
-                      <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground">User</TableHead>
-                      <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground">Center</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
+                <>
+                  <div className="md:hidden p-3 space-y-2.5">
                     {auditLogs.map((log) => (
-                      <TableRow key={log._id} className="group hover:bg-slate-50/80">
-                        <TableCell className="text-[12px] text-muted-foreground tabular-nums whitespace-nowrap">
-                          {new Date(log.createdAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
-                        </TableCell>
-                        <TableCell>
+                      <div key={log._id} className="rounded-xl border border-border/70 bg-white p-3 space-y-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-xs text-muted-foreground tabular-nums">{formatStamp(log.createdAt)}</p>
                           <Badge variant={actionBadge(log.action)}>{log.action.replace(/_/g, " ")}</Badge>
-                        </TableCell>
-                        <TableCell className="text-[12px] text-muted-foreground max-w-[360px] truncate">{log.description}</TableCell>
-                        <TableCell className="text-[12px]">{log.user ? `${log.user.firstName} ${log.user.lastName}` : "System"}</TableCell>
-                        <TableCell className="text-[12px] text-muted-foreground">{log.healthCenter?.name || "-"}</TableCell>
-                      </TableRow>
+                        </div>
+                        <p className="text-sm text-foreground leading-snug">{log.description}</p>
+                        <div className="text-xs text-muted-foreground flex flex-wrap gap-x-3 gap-y-1">
+                          <span>User: {log.user ? `${log.user.firstName} ${log.user.lastName}` : "System"}</span>
+                          <span>Center: {log.healthCenter?.name || "-"}</span>
+                        </div>
+                      </div>
                     ))}
-                  </TableBody>
-                </Table>
+                  </div>
+
+                  <div className="hidden md:block">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="hover:bg-transparent">
+                          <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground">Date/Time</TableHead>
+                          <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground">Action</TableHead>
+                          <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground">Description</TableHead>
+                          <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground">User</TableHead>
+                          <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground">Center</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {auditLogs.map((log) => (
+                          <TableRow key={log._id} className="group hover:bg-slate-50/80">
+                            <TableCell className="text-[12px] text-muted-foreground tabular-nums whitespace-nowrap">
+                              {formatStamp(log.createdAt)}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant={actionBadge(log.action)}>{log.action.replace(/_/g, " ")}</Badge>
+                            </TableCell>
+                            <TableCell className="text-[12px] text-muted-foreground max-w-[360px] truncate">{log.description}</TableCell>
+                            <TableCell className="text-[12px]">{log.user ? `${log.user.firstName} ${log.user.lastName}` : "System"}</TableCell>
+                            <TableCell className="text-[12px] text-muted-foreground">{log.healthCenter?.name || "-"}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </>
               )}
             </CardContent>
           </Card>
@@ -270,36 +317,57 @@ export default function LogsPage() {
               ) : records.length === 0 ? (
                 <div className="text-center py-16 text-sm text-muted-foreground">No dispensing records found.</div>
               ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow className="hover:bg-transparent">
-                      <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground">Date/Time</TableHead>
-                      <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground">Medicine</TableHead>
-                      <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground">Program</TableHead>
-                      <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground text-right">Dispensed</TableHead>
-                      <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground">Staff</TableHead>
-                      <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground">Center</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
+                <>
+                  <div className="md:hidden p-3 space-y-2.5">
                     {records.map((record) => (
-                      <TableRow key={record._id} className="group hover:bg-slate-50/80">
-                        <TableCell className="text-[12px] text-muted-foreground tabular-nums whitespace-nowrap">
-                          {new Date(record.createdAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
-                        </TableCell>
-                        <TableCell className="text-[12px] font-medium">
-                          {record.medicine?.name || "Unknown"}
-                        </TableCell>
-                        <TableCell className="text-[12px] text-muted-foreground">{record.medicine?.category || "-"}</TableCell>
-                        <TableCell className="text-[12px] text-right tabular-nums">
-                          {record.quantity} {record.medicine?.unit || "pcs"}
-                        </TableCell>
-                        <TableCell className="text-[12px]">{record.dispensedBy ? `${record.dispensedBy.firstName} ${record.dispensedBy.lastName}` : "-"}</TableCell>
-                        <TableCell className="text-[12px] text-muted-foreground">{record.healthCenter?.name || "-"}</TableCell>
-                      </TableRow>
+                      <div key={record._id} className="rounded-xl border border-border/70 bg-white p-3 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs text-muted-foreground tabular-nums">{formatStamp(record.createdAt)}</p>
+                          <Badge variant="default" className="capitalize">{record.quantity} {record.medicine?.unit || "pcs"}</Badge>
+                        </div>
+                        <p className="text-sm font-semibold text-foreground">{record.medicine?.name || "Unknown"}</p>
+                        <p className="text-xs text-muted-foreground">{record.medicine?.category || "-"}</p>
+                        <div className="text-xs text-muted-foreground flex flex-wrap gap-x-3 gap-y-1">
+                          <span>Staff: {record.dispensedBy ? `${record.dispensedBy.firstName} ${record.dispensedBy.lastName}` : "-"}</span>
+                          <span>Center: {record.healthCenter?.name || "-"}</span>
+                        </div>
+                      </div>
                     ))}
-                  </TableBody>
-                </Table>
+                  </div>
+
+                  <div className="hidden md:block">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="hover:bg-transparent">
+                          <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground">Date/Time</TableHead>
+                          <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground">Medicine</TableHead>
+                          <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground">Program</TableHead>
+                          <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground text-right">Dispensed</TableHead>
+                          <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground">Staff</TableHead>
+                          <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground">Center</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {records.map((record) => (
+                          <TableRow key={record._id} className="group hover:bg-slate-50/80">
+                            <TableCell className="text-[12px] text-muted-foreground tabular-nums whitespace-nowrap">
+                              {formatStamp(record.createdAt)}
+                            </TableCell>
+                            <TableCell className="text-[12px] font-medium">
+                              {record.medicine?.name || "Unknown"}
+                            </TableCell>
+                            <TableCell className="text-[12px] text-muted-foreground">{record.medicine?.category || "-"}</TableCell>
+                            <TableCell className="text-[12px] text-right tabular-nums">
+                              {record.quantity} {record.medicine?.unit || "pcs"}
+                            </TableCell>
+                            <TableCell className="text-[12px]">{record.dispensedBy ? `${record.dispensedBy.firstName} ${record.dispensedBy.lastName}` : "-"}</TableCell>
+                            <TableCell className="text-[12px] text-muted-foreground">{record.healthCenter?.name || "-"}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </>
               )}
             </CardContent>
           </Card>
@@ -331,30 +399,57 @@ export default function LogsPage() {
               ) : forecast.length === 0 ? (
                 <div className="text-center py-16 text-sm text-muted-foreground">No forecast data available yet.</div>
               ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow className="hover:bg-transparent">
-                      <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground">Medicine</TableHead>
-                      <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground">Program</TableHead>
-                      <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground text-right">Current Qty</TableHead>
-                      <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground text-right">Avg/Day (60d)</TableHead>
-                      <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground text-right">Projected Stockout (Days)</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
+                <>
+                  <div className="md:hidden p-3 space-y-2.5">
                     {forecast.map((item) => (
-                      <TableRow key={item.medicineId} className="group hover:bg-slate-50/80">
-                        <TableCell className="text-[12px] font-medium">{item.medicineName}</TableCell>
-                        <TableCell className="text-[12px] text-muted-foreground">{item.category}</TableCell>
-                        <TableCell className="text-[12px] text-right tabular-nums">{item.currentQuantity} {item.unit}</TableCell>
-                        <TableCell className="text-[12px] text-right tabular-nums">{item.movingAverage60Day}</TableCell>
-                        <TableCell className="text-[12px] text-right tabular-nums">
-                          {item.projectedDaysUntilStockout == null ? "N/A" : item.projectedDaysUntilStockout}
-                        </TableCell>
-                      </TableRow>
+                      <div key={item.medicineId} className="rounded-xl border border-border/70 bg-white p-3 space-y-2">
+                        <p className="text-sm font-semibold text-foreground">{item.medicineName}</p>
+                        <p className="text-xs text-muted-foreground">{item.category}</p>
+                        <div className="grid grid-cols-3 gap-2 pt-1">
+                          <div className="rounded-md bg-muted/50 p-2">
+                            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Current</p>
+                            <p className="text-xs font-semibold mt-0.5">{item.currentQuantity} {item.unit}</p>
+                          </div>
+                          <div className="rounded-md bg-muted/50 p-2">
+                            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Avg/Day</p>
+                            <p className="text-xs font-semibold mt-0.5">{item.movingAverage60Day}</p>
+                          </div>
+                          <div className="rounded-md bg-muted/50 p-2">
+                            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Stockout</p>
+                            <p className="text-xs font-semibold mt-0.5">{item.projectedDaysUntilStockout == null ? "N/A" : item.projectedDaysUntilStockout}</p>
+                          </div>
+                        </div>
+                      </div>
                     ))}
-                  </TableBody>
-                </Table>
+                  </div>
+
+                  <div className="hidden md:block">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="hover:bg-transparent">
+                          <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground">Medicine</TableHead>
+                          <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground">Program</TableHead>
+                          <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground text-right">Current Qty</TableHead>
+                          <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground text-right">Avg/Day (60d)</TableHead>
+                          <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground text-right">Projected Stockout (Days)</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {forecast.map((item) => (
+                          <TableRow key={item.medicineId} className="group hover:bg-slate-50/80">
+                            <TableCell className="text-[12px] font-medium">{item.medicineName}</TableCell>
+                            <TableCell className="text-[12px] text-muted-foreground">{item.category}</TableCell>
+                            <TableCell className="text-[12px] text-right tabular-nums">{item.currentQuantity} {item.unit}</TableCell>
+                            <TableCell className="text-[12px] text-right tabular-nums">{item.movingAverage60Day}</TableCell>
+                            <TableCell className="text-[12px] text-right tabular-nums">
+                              {item.projectedDaysUntilStockout == null ? "N/A" : item.projectedDaysUntilStockout}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </>
               )}
             </CardContent>
           </Card>

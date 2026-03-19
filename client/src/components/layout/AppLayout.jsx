@@ -2,7 +2,8 @@ import { Outlet, Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import Sidebar from "./Sidebar";
 import MobileNav from "./MobileNav";
-import { Shield } from "lucide-react";
+import { Shield, LogOut } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 const pageLabels = {
   "/dashboard": "Dashboard",
@@ -15,7 +16,7 @@ const pageLabels = {
 };
 
 export default function AppLayout() {
-  const { isAuthenticated, loading, user } = useAuth();
+  const { isAuthenticated, loading, user, logout } = useAuth();
   const location = useLocation();
 
   if (loading) {
@@ -50,6 +51,16 @@ export default function AppLayout() {
             <h2 className="text-[15px] font-semibold text-foreground">{currentPage}</h2>
           </div>
           <div className="flex items-center gap-3">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="md:hidden h-8 px-2.5 gap-1.5"
+              onClick={logout}
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              Logout
+            </Button>
             <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg" style={{ background: 'hsl(168 25% 94%)' }}>
               <div className="w-1.5 h-1.5 rounded-full" style={{ background: 'hsl(166 56% 45%)' }} />
               <span className="text-xs font-medium" style={{ color: 'hsl(168 40% 22%)' }}>
