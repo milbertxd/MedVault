@@ -9,29 +9,9 @@ const { startCronJobs } = require("./cron/alertCron");
 
 const app = express();
 
-const normalizeOrigin = (origin) => origin?.trim().replace(/\/$/, "");
-const allowedOrigins = (process.env.CLIENT_URLS || process.env.CLIENT_URL || "http://localhost:5173")
-  .split(",")
-  .map(normalizeOrigin)
-  .filter(Boolean);
-const renderOriginPattern = /^https:\/\/[a-z0-9-]+\.onrender\.com$/i;
-
 const corsOptions = {
-  origin: (origin, callback) => {
-    if (!origin) return callback(null, true);
-    const normalized = normalizeOrigin(origin);
-
-    if (
-      allowedOrigins.includes(normalized)
-      || renderOriginPattern.test(normalized)
-      || process.env.NODE_ENV === "production"
-    ) {
-      return callback(null, true);
-    }
-
-    return callback(null, false);
-  },
-  credentials: true,
+  origin: "*",
+  credentials: false,
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   allowedHeaders: ["Origin", "X-Requested-With", "Content-Type", "Accept", "Authorization"],
   optionsSuccessStatus: 204,
