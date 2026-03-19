@@ -69,14 +69,27 @@ app.use((err, req, res, next) => {
 
 const PORT = process.env.PORT || 5000;
 
-const start = async () => {
-  await connectDB();
-  startCronJobs();
-  app.listen(PORT, () => {
-    if (process.env.NODE_ENV !== "production") {
-      console.log(`Server running on port ${PORT}`);
+let cronStarted = false;
+
+const initDatabaseWithRetry = async () => {
+  try {
+    await connectDB();
+    if (!cronStarted) {
+      startCronJobs();
+      cronStarted = true;
     }
+  } catch (error) {
+    console.error(`Database connection failed: ${error.message}`);
+    setTimeout(initDatabaseWithRetry, 10000);
+  }
+};
+
+const start = async () => {
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`Server running on port ${PORT}`);
   });
+
+  initDatabaseWithRetry();
 };
 
 start();
