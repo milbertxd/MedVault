@@ -28,7 +28,21 @@ api.interceptors.request.use(
 // Response interceptor for auth errors
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
+    const originalRequest = error.config || {};
+
+    // Render free instances can cold-start and briefly return network/CORS failures.
+    // Retry idempotent GETs once after a short delay.
+    if (
+      error.code === "ERR_NETWORK"
+      && (originalRequest.method || "").toLowerCase() === "get"
+      && !originalRequest.__coldStartRetry
+    ) {
+      originalRequest.__coldStartRetry = true;
+      await new Promise((resolve) => setTimeout(resolve, 7000));
+      return api.request(originalRequest);
+    }
+
     if (error.response?.status === 401) {
       localStorage.removeItem("medvault_token");
       localStorage.removeItem("medvault_user");
