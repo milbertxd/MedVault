@@ -22,9 +22,31 @@ const navBase = [
 export default function MobileNav() {
   const { isCHOAdmin, isCHOMonitor } = useAuth();
   const [unreadCount, setUnreadCount] = useState(0);
+  const [isMobileViewport, setIsMobileViewport] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.matchMedia("(max-width: 767px)").matches;
+  });
 
   useEffect(() => {
+    if (typeof window === "undefined") return () => {};
+    const media = window.matchMedia("(max-width: 767px)");
+    const update = () => setIsMobileViewport(media.matches);
+    update();
+
+    if (media.addEventListener) {
+      media.addEventListener("change", update);
+      return () => media.removeEventListener("change", update);
+    }
+
+    media.addListener(update);
+    return () => media.removeListener(update);
+  }, []);
+
+  useEffect(() => {
+    if (!isMobileViewport) return () => {};
+
     const fetchUnread = async () => {
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
       try {
         const { data } = await alertAPI.getUnreadCount();
         setUnreadCount(data.count || 0);
@@ -34,9 +56,9 @@ export default function MobileNav() {
     };
 
     fetchUnread();
-    const interval = setInterval(fetchUnread, 60000);
+    const interval = setInterval(fetchUnread, 120000);
     return () => clearInterval(interval);
-  }, []);
+  }, [isMobileViewport]);
 
   const baseNav = isCHOMonitor
     ? navBase.filter((item) => item.href !== "/scanner")

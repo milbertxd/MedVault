@@ -4,10 +4,13 @@ const API_BASE = import.meta.env.VITE_API_URL || "/api";
 
 const api = axios.create({
   baseURL: API_BASE,
+  timeout: 20000,
   headers: {
     "Content-Type": "application/json",
   },
 });
+
+const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // Request interceptor to add auth token
 api.interceptors.request.use(
@@ -30,16 +33,20 @@ api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config || {};
+    const method = (originalRequest.method || "").toLowerCase();
 
-    // Render free instances can cold-start and briefly return network/CORS failures.
-    // Retry idempotent GETs once after a short delay.
-    if (
-      error.code === "ERR_NETWORK"
-      && (originalRequest.method || "").toLowerCase() === "get"
-      && !originalRequest.__coldStartRetry
-    ) {
-      originalRequest.__coldStartRetry = true;
-      await new Promise((resolve) => setTimeout(resolve, 7000));
+    const shouldRetryGet = method === "get";
+    const retryCount = originalRequest.__retryCount || 0;
+    const isNetworkLike = error.code === "ERR_NETWORK" || !error.response;
+    const isTransientServer = error.response?.status === 502
+      || error.response?.status === 503
+      || error.response?.status === 504;
+
+    // Render free instances can cold-start. Retry idempotent GETs with backoff.
+    if (shouldRetryGet && (isNetworkLike || isTransientServer) && retryCount < 3) {
+      const backoffMs = [1800, 4200, 8000][retryCount] || 8000;
+      originalRequest.__retryCount = retryCount + 1;
+      await delay(backoffMs);
       return api.request(originalRequest);
     }
 
@@ -65,6 +72,7 @@ export const authAPI = {
   getMe: () => api.get("/auth/me"),
   changePassword: (data) => api.put("/auth/change-password", data),
   getHealthCenters: () => api.get("/auth/health-centers"),
+  healthCheck: () => api.get("/health"),
 };
 
 // Medicine API

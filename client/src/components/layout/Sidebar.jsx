@@ -38,20 +38,43 @@ export default function Sidebar() {
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [isDesktopViewport, setIsDesktopViewport] = useState(() => {
+    if (typeof window === "undefined") return true;
+    return window.matchMedia("(min-width: 768px)").matches;
+  });
 
   useEffect(() => {
+    if (typeof window === "undefined") return () => {};
+    const media = window.matchMedia("(min-width: 768px)");
+    const update = () => setIsDesktopViewport(media.matches);
+    update();
+
+    if (media.addEventListener) {
+      media.addEventListener("change", update);
+      return () => media.removeEventListener("change", update);
+    }
+
+    media.addListener(update);
+    return () => media.removeListener(update);
+  }, []);
+
+  useEffect(() => {
+    if (!isDesktopViewport) return () => {};
+
     const fetchUnread = async () => {
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
       try {
         const { data } = await alertAPI.getUnreadCount();
-        setUnreadCount(data.count);
+        setUnreadCount(data.count || 0);
       } catch {
         // silently fail
       }
     };
+
     fetchUnread();
-    const interval = setInterval(fetchUnread, 60000);
+    const interval = setInterval(fetchUnread, 120000);
     return () => clearInterval(interval);
-  }, []);
+  }, [isDesktopViewport]);
 
   const allNav = [
     ...(isCHOMonitor ? navigation.filter((item) => item.href !== "/scanner") : navigation),

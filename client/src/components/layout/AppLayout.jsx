@@ -1,4 +1,5 @@
 import { Outlet, Navigate, useLocation } from "react-router-dom";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import Sidebar from "./Sidebar";
 import MobileNav from "./MobileNav";
@@ -18,6 +19,25 @@ const pageLabels = {
 export default function AppLayout() {
   const { isAuthenticated, loading, user, logout } = useAuth();
   const location = useLocation();
+  const [isDesktopViewport, setIsDesktopViewport] = useState(() => {
+    if (typeof window === "undefined") return true;
+    return window.matchMedia("(min-width: 768px)").matches;
+  });
+
+  useEffect(() => {
+    if (typeof window === "undefined") return () => {};
+    const media = window.matchMedia("(min-width: 768px)");
+    const update = () => setIsDesktopViewport(media.matches);
+    update();
+
+    if (media.addEventListener) {
+      media.addEventListener("change", update);
+      return () => media.removeEventListener("change", update);
+    }
+
+    media.addListener(update);
+    return () => media.removeListener(update);
+  }, []);
 
   if (loading) {
     return (
@@ -41,9 +61,7 @@ export default function AppLayout() {
 
   return (
     <div className="flex min-h-screen bg-background">
-      <div className="hidden md:flex">
-        <Sidebar />
-      </div>
+      {isDesktopViewport && <Sidebar />}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Topbar */}
         <header className="sticky top-0 z-30 flex items-center justify-between h-14 md:h-16 px-4 md:px-6 bg-card/95 border-b border-border shrink-0 backdrop-blur supports-[backdrop-filter]:bg-card/85 shadow-xs">
@@ -76,7 +94,7 @@ export default function AppLayout() {
           </div>
         </main>
       </div>
-      <MobileNav />
+      {!isDesktopViewport && <MobileNav />}
     </div>
   );
 }
