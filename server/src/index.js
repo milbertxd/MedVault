@@ -14,22 +14,29 @@ const allowedOrigins = (process.env.CLIENT_URLS || process.env.CLIENT_URL || "ht
   .split(",")
   .map(normalizeOrigin)
   .filter(Boolean);
+const renderOriginPattern = /^https:\/\/[a-z0-9-]+\.onrender\.com$/i;
+
+const corsOptions = {
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true);
+    const normalized = normalizeOrigin(origin);
+    if (
+      allowedOrigins.includes(normalized)
+      || renderOriginPattern.test(normalized)
+      || process.env.NODE_ENV === "production"
+    ) {
+      return callback(null, true);
+    }
+    return callback(new Error(`Not allowed by CORS: ${normalized}`));
+  },
+  credentials: true,
+  optionsSuccessStatus: 204,
+};
 
 // Security middleware
 app.use(helmet());
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      if (!origin) return callback(null, true);
-      const normalized = normalizeOrigin(origin);
-      if (allowedOrigins.includes(normalized)) {
-        return callback(null, true);
-      }
-      return callback(new Error("Not allowed by CORS"));
-    },
-    credentials: true,
-  })
-);
+app.use(cors(corsOptions));
+app.options("*", cors(corsOptions));
 
 // Rate limiting
 const limiter = rateLimit({
