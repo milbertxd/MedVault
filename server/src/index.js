@@ -4,6 +4,7 @@ const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
+const mongoose = require("mongoose");
 const connectDB = require("./config/db");
 const { startCronJobs } = require("./cron/alertCron");
 
@@ -43,6 +44,17 @@ const authLimiter = rateLimit({
 app.use(express.json({ limit: "10kb" }));
 app.use(express.urlencoded({ extended: true, limit: "10kb" }));
 
+// Prevent upstream gateway timeouts when DB is not connected yet.
+app.use((req, res, next) => {
+  if (req.path === "/api/health") return next();
+  if (mongoose.connection.readyState !== 1) {
+    return res.status(503).json({
+      message: "Database is reconnecting. Please retry in a few seconds.",
+    });
+  }
+  next();
+});
+
 // Disable x-powered-by
 app.disable("x-powered-by");
 
@@ -55,7 +67,18 @@ app.use("/api/reports", require("./routes/reports"));
 
 // Health check
 app.get("/api/health", (req, res) => {
-  res.json({ status: "ok", timestamp: new Date().toISOString() });
+  const readyState = mongoose.connection.readyState;
+  const dbStatusMap = {
+    0: "disconnected",
+    1: "connected",
+    2: "connecting",
+    3: "disconnecting",
+  };
+  res.json({
+    status: "ok",
+    database: dbStatusMap[readyState] || "unknown",
+    timestamp: new Date().toISOString(),
+  });
 });
 
 // 404 handler
