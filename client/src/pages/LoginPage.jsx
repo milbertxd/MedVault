@@ -28,6 +28,8 @@ export default function LoginPage() {
   }, [isAuthenticated, navigate]);
 
   useEffect(() => {
+    if (!isRegister) return;
+
     const fetchCenters = async () => {
       try {
         const { data } = await authAPI.getHealthCenters();
@@ -37,7 +39,7 @@ export default function LoginPage() {
       }
     };
     fetchCenters();
-  }, []);
+  }, [isRegister]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -52,7 +54,13 @@ export default function LoginPage() {
       }
       navigate("/dashboard");
     } catch (err) {
-      setError(err.response?.data?.message || "An error occurred");
+      const status = err?.response?.status;
+      const isTransient = err?.code === "ERR_NETWORK" || status === 502 || status === 503 || status === 504;
+      if (isTransient) {
+        setError("Server is waking up. Please wait a few seconds and try again.");
+      } else {
+        setError(err.response?.data?.message || "An error occurred");
+      }
     } finally {
       setLoading(false);
     }

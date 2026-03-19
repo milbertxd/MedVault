@@ -23,7 +23,28 @@ export function AuthProvider({ children }) {
   }, []);
 
   const login = useCallback(async (email, password) => {
-    const { data } = await authAPI.login({ email, password });
+    // Warm up API first to reduce cold-start failures on free hosting.
+    try {
+      await authAPI.healthCheck();
+    } catch {
+      // Continue to login attempt; retry block below handles transient failures.
+    }
+
+    const isTransientError = (err) => {
+      const status = err?.response?.status;
+      return err?.code === "ERR_NETWORK" || status === 502 || status === 503 || status === 504;
+    };
+
+    let response;
+    try {
+      response = await authAPI.login({ email, password });
+    } catch (err) {
+      if (!isTransientError(err)) throw err;
+      await new Promise((resolve) => setTimeout(resolve, 4000));
+      response = await authAPI.login({ email, password });
+    }
+
+    const { data } = response;
     localStorage.setItem("medvault_token", data.token);
     localStorage.setItem("medvault_user", JSON.stringify(data.user));
     setUser(data.user);
