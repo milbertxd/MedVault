@@ -18,6 +18,7 @@ import {
 import {
   Plus, Search, Edit, Trash2, PackagePlus, PackageMinus, ChevronLeft, ChevronRight, Package, QrCode, ScanLine, ShieldAlert,
 } from "lucide-react";
+import useQrScanner from "@/hooks/useQrScanner";
 
 const CATEGORIES = [
   "National TB",
@@ -43,6 +44,7 @@ const emptyForm = {
 export default function InventoryPage() {
   const { user, isCHOMonitor } = useAuth();
   const canEditStock = !isCHOMonitor;
+  const isSecureContext = typeof window === "undefined" ? true : window.isSecureContext;
 
   const [medicines, setMedicines] = useState([]);
   const [pagination, setPagination] = useState({});
@@ -69,8 +71,6 @@ export default function InventoryPage() {
   const [scannerError, setScannerError] = useState("");
 
   const videoRef = useRef(null);
-  const streamRef = useRef(null);
-  const scanIntervalRef = useRef(null);
 
   const fetchMedicines = useCallback(async () => {
     setLoading(true);
@@ -97,68 +97,18 @@ export default function InventoryPage() {
     setPage(1);
   }, [search, categoryFilter, statusFilter]);
 
-  const stopScanner = useCallback(() => {
-    if (scanIntervalRef.current) {
-      clearInterval(scanIntervalRef.current);
-      scanIntervalRef.current = null;
-    }
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((track) => track.stop());
-      streamRef.current = null;
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!showQRDispense) {
-      stopScanner();
-      return;
-    }
-
-    const startScanner = async () => {
+  const { stop: stopScanner } = useQrScanner({
+    active: showQRDispense,
+    videoRef,
+    onDetected: (detected) => {
+      setQrData((prev) => ({ ...prev, qrString: detected }));
       setScannerError("");
-
-      if (!window.BarcodeDetector) {
-        setScannerError("Camera scanner is not supported on this browser. You can still enter QR text manually.");
-        return;
-      }
-
-      try {
-        const detector = new window.BarcodeDetector({ formats: ["qr_code"] });
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: { ideal: "environment" },
-          },
-          audio: false,
-        });
-
-        streamRef.current = stream;
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          await videoRef.current.play();
-        }
-
-        scanIntervalRef.current = setInterval(async () => {
-          if (!videoRef.current || videoRef.current.readyState < 2) return;
-          try {
-            const codes = await detector.detect(videoRef.current);
-            if (codes.length > 0 && codes[0].rawValue) {
-              const detected = codes[0].rawValue.trim().toUpperCase();
-              setQrData((prev) => ({ ...prev, qrString: detected }));
-              stopScanner();
-            }
-          } catch {
-            // ignore intermittent detector frame errors
-          }
-        }, 700);
-      } catch {
-        setScannerError("Unable to access camera. Please check camera permissions.");
-      }
-    };
-
-    startScanner();
-
-    return () => stopScanner();
-  }, [showQRDispense, stopScanner]);
+      stopScanner();
+    },
+    onError: setScannerError,
+    stopOnDetected: true,
+    scanIntervalMs: 700,
+  });
 
   const openCreateForm = () => {
     setEditingMed(null);
@@ -326,14 +276,14 @@ export default function InventoryPage() {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-[22px] font-bold text-foreground tracking-tight">Inventory</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
             Program-based medicine stock for {user?.healthCenter?.name || "health center"}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="grid w-full sm:w-auto grid-cols-1 sm:grid-cols-2 gap-2">
           {canEditStock && (
             <Button variant="outline" className="gap-2" onClick={() => {
               setShowQRDispense(true);
@@ -360,7 +310,7 @@ export default function InventoryPage() {
 
       <Card className="!shadow-none border border-border/60">
         <CardContent className="p-4">
-          <div className="flex flex-wrap gap-3">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_220px_170px]">
             <div className="flex-1 min-w-[220px]">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -373,7 +323,7 @@ export default function InventoryPage() {
               </div>
             </div>
             <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-              <SelectTrigger className="w-[220px] h-10">
+              <SelectTrigger className="w-full h-10">
                 <SelectValue placeholder="All Program Categories" />
               </SelectTrigger>
               <SelectContent>
@@ -384,7 +334,7 @@ export default function InventoryPage() {
               </SelectContent>
             </Select>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[170px] h-10">
+              <SelectTrigger className="w-full h-10">
                 <SelectValue placeholder="All Status" />
               </SelectTrigger>
               <SelectContent>
@@ -414,53 +364,45 @@ export default function InventoryPage() {
               <p className="text-xs text-muted-foreground mt-1">Try adjusting your filters or add a new medicine</p>
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow className="hover:bg-transparent">
-                  <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground">Medicine</TableHead>
-                  <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground">Program</TableHead>
-                  <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground">Batch / QR</TableHead>
-                  <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground text-right">Current Qty</TableHead>
-                  <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground">Expiry</TableHead>
-                  <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground">Status</TableHead>
-                  {canEditStock && <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground text-right">Actions</TableHead>}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+            <>
+              <div className="lg:hidden p-3 space-y-3">
                 {medicines.map((med) => (
-                  <TableRow key={med._id} className="group hover:bg-slate-50/80">
-                    <TableCell>
-                      <div>
-                        <p className="text-[13px] font-semibold text-foreground">{med.name}</p>
-                        {med.genericName && <p className="text-[11px] text-muted-foreground">{med.genericName}</p>}
+                  <Card key={med._id} className="border border-border/70 shadow-none">
+                    <CardContent className="p-3 space-y-2.5">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-semibold text-foreground leading-tight">{med.name}</p>
+                          {med.genericName && <p className="text-xs text-muted-foreground mt-0.5">{med.genericName}</p>}
+                        </div>
+                        {getStatusBadge(med)}
                       </div>
-                    </TableCell>
-                    <TableCell><span className="text-[12px] text-muted-foreground">{med.category}</span></TableCell>
-                    <TableCell>
-                      <div className="text-[12px] text-muted-foreground">
-                        <p>Batch: {med.batchNumber || "N/A"}</p>
-                        <p className="inline-flex items-center gap-1 mt-0.5"><QrCode className="w-3 h-3" /> {med.qrCode || "N/A"}</p>
+
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div className="rounded-md bg-muted/50 px-2.5 py-2">
+                          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Program</p>
+                          <p className="text-foreground mt-0.5">{med.category}</p>
+                        </div>
+                        <div className="rounded-md bg-muted/50 px-2.5 py-2">
+                          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Stock</p>
+                          <p className="text-foreground mt-0.5 font-semibold">{med.quantity} {med.unit}</p>
+                        </div>
+                        <div className="rounded-md bg-muted/50 px-2.5 py-2 col-span-2">
+                          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Batch / QR</p>
+                          <p className="text-foreground mt-0.5">{med.batchNumber || "N/A"}</p>
+                          <p className="mt-1 text-[11px] text-muted-foreground break-all inline-flex items-center gap-1"><QrCode className="w-3 h-3 shrink-0" /> {med.qrCode || "N/A"}</p>
+                        </div>
                       </div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <span className="text-[13px] font-semibold tabular-nums">
-                        {med.quantity} <span className="text-muted-foreground font-normal text-[11px]">{med.unit}</span>
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <span className="text-[12px] text-muted-foreground tabular-nums">
-                        {new Date(med.expiryDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-                      </span>
-                    </TableCell>
-                    <TableCell>{getStatusBadge(med)}</TableCell>
-                    {canEditStock && (
-                      <TableCell>
-                        <div className="flex items-center justify-end gap-0.5 opacity-60 group-hover:opacity-100 transition-opacity">
+
+                      <p className="text-xs text-muted-foreground">
+                        Expires: {new Date(med.expiryDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                      </p>
+
+                      {canEditStock && (
+                        <div className="grid grid-cols-4 gap-1.5 pt-1">
                           <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 rounded-lg"
-                            title="Add Stock"
+                            variant="outline"
+                            size="sm"
+                            className="h-8"
                             onClick={() => {
                               setSelectedMed(med);
                               setStockData({ quantity: 1, type: "add", reason: "" });
@@ -471,10 +413,9 @@ export default function InventoryPage() {
                             <PackagePlus className="w-4 h-4 text-emerald-600" />
                           </Button>
                           <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 rounded-lg"
-                            title="Remove Stock"
+                            variant="outline"
+                            size="sm"
+                            className="h-8"
                             onClick={() => {
                               setSelectedMed(med);
                               setStockData({ quantity: 1, type: "remove", reason: "" });
@@ -484,27 +425,121 @@ export default function InventoryPage() {
                           >
                             <PackageMinus className="w-4 h-4 text-amber-500" />
                           </Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg" onClick={() => openEditForm(med)}>
-                            <Edit className="w-3.5 h-3.5 text-muted-foreground" />
+                          <Button variant="outline" size="sm" className="h-8" onClick={() => openEditForm(med)}>
+                            <Edit className="w-3.5 h-3.5" />
                           </Button>
                           <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 rounded-lg"
+                            variant="outline"
+                            size="sm"
+                            className="h-8"
                             onClick={() => {
                               setSelectedMed(med);
                               setShowDelete(true);
                             }}
                           >
-                            <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                            <Trash2 className="w-3.5 h-3.5 text-red-500" />
                           </Button>
                         </div>
-                      </TableCell>
-                    )}
-                  </TableRow>
+                      )}
+                    </CardContent>
+                  </Card>
                 ))}
-              </TableBody>
-            </Table>
+              </div>
+
+              <div className="hidden lg:block">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground">Medicine</TableHead>
+                      <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground">Program</TableHead>
+                      <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground">Batch / QR</TableHead>
+                      <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground text-right">Current Qty</TableHead>
+                      <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground">Expiry</TableHead>
+                      <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground">Status</TableHead>
+                      {canEditStock && <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground text-right">Actions</TableHead>}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {medicines.map((med) => (
+                      <TableRow key={med._id} className="group hover:bg-slate-50/80">
+                        <TableCell>
+                          <div>
+                            <p className="text-[13px] font-semibold text-foreground">{med.name}</p>
+                            {med.genericName && <p className="text-[11px] text-muted-foreground">{med.genericName}</p>}
+                          </div>
+                        </TableCell>
+                        <TableCell><span className="text-[12px] text-muted-foreground">{med.category}</span></TableCell>
+                        <TableCell>
+                          <div className="text-[12px] text-muted-foreground">
+                            <p>Batch: {med.batchNumber || "N/A"}</p>
+                            <p className="inline-flex items-center gap-1 mt-0.5"><QrCode className="w-3 h-3" /> {med.qrCode || "N/A"}</p>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <span className="text-[13px] font-semibold tabular-nums">
+                            {med.quantity} <span className="text-muted-foreground font-normal text-[11px]">{med.unit}</span>
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-[12px] text-muted-foreground tabular-nums">
+                            {new Date(med.expiryDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                          </span>
+                        </TableCell>
+                        <TableCell>{getStatusBadge(med)}</TableCell>
+                        {canEditStock && (
+                          <TableCell>
+                            <div className="flex items-center justify-end gap-0.5 opacity-60 group-hover:opacity-100 transition-opacity">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 rounded-lg"
+                                title="Add Stock"
+                                onClick={() => {
+                                  setSelectedMed(med);
+                                  setStockData({ quantity: 1, type: "add", reason: "" });
+                                  setFormError("");
+                                  setShowStock(true);
+                                }}
+                              >
+                                <PackagePlus className="w-4 h-4 text-emerald-600" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 rounded-lg"
+                                title="Remove Stock"
+                                onClick={() => {
+                                  setSelectedMed(med);
+                                  setStockData({ quantity: 1, type: "remove", reason: "" });
+                                  setFormError("");
+                                  setShowStock(true);
+                                }}
+                              >
+                                <PackageMinus className="w-4 h-4 text-amber-500" />
+                              </Button>
+                              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg" onClick={() => openEditForm(med)}>
+                                <Edit className="w-3.5 h-3.5 text-muted-foreground" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 rounded-lg"
+                                onClick={() => {
+                                  setSelectedMed(med);
+                                  setShowDelete(true);
+                                }}
+                              >
+                                <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        )}
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>
@@ -530,7 +565,7 @@ export default function InventoryPage() {
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
             {formError && <div className="p-3 rounded-md bg-destructive/10 text-destructive text-sm">{formError}</div>}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2"><Label>Medicine Name *</Label><Input value={formData.name} onChange={(e) => updateField("name", e.target.value)} required /></div>
               <div className="space-y-2"><Label>Generic Name</Label><Input value={formData.genericName} onChange={(e) => updateField("genericName", e.target.value)} /></div>
               <div className="space-y-2"><Label>Brand Name</Label><Input value={formData.brandName} onChange={(e) => updateField("brandName", e.target.value)} /></div>
@@ -633,10 +668,29 @@ export default function InventoryPage() {
               <div className="rounded-lg overflow-hidden border border-border bg-black/90">
                 <video ref={videoRef} className="w-full h-52 object-cover" muted playsInline />
               </div>
+              <div className="mt-2 flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8"
+                  onClick={() => {
+                    stopScanner();
+                    setScannerError("");
+                    setShowQRDispense(false);
+                    setTimeout(() => setShowQRDispense(true), 130);
+                  }}
+                >
+                  Retry Camera
+                </Button>
+              </div>
               {scannerError && (
                 <p className="mt-2 text-xs text-amber-600 inline-flex items-center gap-1">
                   <ShieldAlert className="w-3.5 h-3.5" /> {scannerError}
                 </p>
+              )}
+              {!isSecureContext && (
+                <p className="mt-2 text-xs text-amber-600">Camera scanning requires HTTPS.</p>
               )}
             </CardContent>
           </Card>
@@ -648,7 +702,7 @@ export default function InventoryPage() {
               <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">QR String</Label>
               <Input value={qrData.qrString} onChange={(e) => setQrData((p) => ({ ...p, qrString: e.target.value.toUpperCase() }))} placeholder="QR string" required />
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">Dispense Qty</Label>
                 <Input type="number" min="1" value={qrData.quantity} onChange={(e) => setQrData((p) => ({ ...p, quantity: e.target.value }))} required />

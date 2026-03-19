@@ -1,6 +1,7 @@
 import { Outlet, Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import Sidebar from "./Sidebar";
+import MobileNav from "./MobileNav";
 import { Shield } from "lucide-react";
 
 const pageLabels = {
@@ -39,10 +40,12 @@ export default function AppLayout() {
 
   return (
     <div className="flex min-h-screen bg-background">
-      <Sidebar />
+      <div className="hidden md:flex">
+        <Sidebar />
+      </div>
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Topbar */}
-        <header className="flex items-center justify-between h-16 px-6 bg-card border-b border-border shrink-0 shadow-xs">
+        <header className="sticky top-0 z-30 flex items-center justify-between h-14 md:h-16 px-4 md:px-6 bg-card/95 border-b border-border shrink-0 backdrop-blur supports-[backdrop-filter]:bg-card/85 shadow-xs">
           <div className="flex items-center gap-3">
             <h2 className="text-[15px] font-semibold text-foreground">{currentPage}</h2>
           </div>
@@ -56,12 +59,13 @@ export default function AppLayout() {
           </div>
         </header>
         {/* Page content */}
-        <main className="flex-1 overflow-auto">
-          <div className="p-6 max-w-[1400px]">
+        <main className="flex-1 overflow-auto pb-20 md:pb-0">
+          <div className="p-4 md:p-6 max-w-[1400px]">
             <Outlet />
           </div>
         </main>
       </div>
+      <MobileNav />
     </div>
   );
 }

@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useRef, useState } from "react";
 import { medicineAPI } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ScanLine, QrCode, ShieldAlert, CheckCircle2 } from "lucide-react";
+import { ScanLine, QrCode, ShieldAlert, CheckCircle2, Camera, CameraOff, RefreshCcw } from "lucide-react";
+import useQrScanner from "@/hooks/useQrScanner";
 
 export default function ScannerPage() {
   const [qrString, setQrString] = useState("");
@@ -14,62 +15,19 @@ export default function ScannerPage() {
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
   const [scannerError, setScannerError] = useState("");
+  const [cameraActive, setCameraActive] = useState(true);
 
   const videoRef = useRef(null);
-  const streamRef = useRef(null);
-  const scanIntervalRef = useRef(null);
+  const isSecureContext = typeof window === "undefined" ? true : window.isSecureContext;
 
-  const stopScanner = useCallback(() => {
-    if (scanIntervalRef.current) {
-      clearInterval(scanIntervalRef.current);
-      scanIntervalRef.current = null;
-    }
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((track) => track.stop());
-      streamRef.current = null;
-    }
-  }, []);
-
-  useEffect(() => {
-    const startScanner = async () => {
-      setScannerError("");
-      if (!window.BarcodeDetector) {
-        setScannerError("Camera QR scanning is not supported on this browser. Manual input remains available.");
-        return;
-      }
-
-      try {
-        const detector = new window.BarcodeDetector({ formats: ["qr_code"] });
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { ideal: "environment" } },
-          audio: false,
-        });
-
-        streamRef.current = stream;
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          await videoRef.current.play();
-        }
-
-        scanIntervalRef.current = setInterval(async () => {
-          if (!videoRef.current || videoRef.current.readyState < 2) return;
-          try {
-            const codes = await detector.detect(videoRef.current);
-            if (codes.length > 0 && codes[0].rawValue) {
-              setQrString(codes[0].rawValue.trim().toUpperCase());
-            }
-          } catch {
-            // ignore frame-level scanner errors
-          }
-        }, 650);
-      } catch {
-        setScannerError("Unable to access camera. Please allow camera permissions.");
-      }
-    };
-
-    startScanner();
-    return () => stopScanner();
-  }, [stopScanner]);
+  const { stop: stopScanner } = useQrScanner({
+    active: cameraActive,
+    videoRef,
+    onDetected: (value) => setQrString(value),
+    onError: setScannerError,
+    stopOnDetected: false,
+    scanIntervalMs: 650,
+  });
 
   const handleDispense = async (e) => {
     e.preventDefault();
@@ -94,7 +52,7 @@ export default function ScannerPage() {
   };
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4 md:space-y-5">
       <div>
         <h1 className="text-[22px] font-bold text-foreground tracking-tight">QR Scanner</h1>
         <p className="text-sm text-muted-foreground mt-0.5">Mobile-first medicine dispensing with real-time stock sufficiency checks</p>
@@ -104,14 +62,40 @@ export default function ScannerPage() {
         <Card>
           <CardHeader>
             <CardTitle className="text-base inline-flex items-center gap-2"><ScanLine className="w-4 h-4" /> Camera Scanner</CardTitle>
-            <CardDescription>Point the camera to medicine QR code to auto-fill the QR field</CardDescription>
+            <CardDescription>Works with BarcodeDetector and fallback decoder for wider mobile support</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="rounded-xl overflow-hidden border border-border bg-black/90">
-              <video ref={videoRef} className="w-full h-[360px] object-cover" muted playsInline />
+            <div className="rounded-xl overflow-hidden border border-border bg-black/90 relative">
+              <video ref={videoRef} className="w-full h-[52vh] min-h-[260px] max-h-[420px] object-cover" muted playsInline />
+              <div className="pointer-events-none absolute inset-0 border-[3px] border-white/20 rounded-xl" />
+              <div className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-56 max-w-[85%] h-32 border-2 border-emerald-300/70 rounded-lg" />
             </div>
+
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Button type="button" variant={cameraActive ? "outline" : "default"} className="gap-2" onClick={() => setCameraActive((v) => !v)}>
+                {cameraActive ? <CameraOff className="w-4 h-4" /> : <Camera className="w-4 h-4" />}
+                {cameraActive ? "Stop Camera" : "Start Camera"}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="gap-2"
+                onClick={() => {
+                  stopScanner();
+                  setScannerError("");
+                  setCameraActive(false);
+                  setTimeout(() => setCameraActive(true), 120);
+                }}
+              >
+                <RefreshCcw className="w-4 h-4" /> Retry Camera
+              </Button>
+            </div>
+
             {scannerError && (
               <p className="mt-3 text-xs text-amber-600 inline-flex items-center gap-1.5"><ShieldAlert className="w-3.5 h-3.5" /> {scannerError}</p>
+            )}
+            {!isSecureContext && (
+              <p className="mt-2 text-xs text-amber-600">Camera scanning requires HTTPS. Open this app from the secure deployed URL.</p>
             )}
           </CardContent>
         </Card>

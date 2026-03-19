@@ -160,3 +160,8 @@ client/
 - API health: `https://<your-api-domain>/api/health`
 - App login: `https://<your-web-domain>/login`
 - Scanner works best on HTTPS pages (Render provides HTTPS by default).
+
+For repeatable operations, use:
+
+- `POST_DEPLOY_SMOKE_TEST.md` for functional validation after each deployment
+- `SECURITY_CLEANUP_CHECKLIST.md` for production hardening and release hygiene

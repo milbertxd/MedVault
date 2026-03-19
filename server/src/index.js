@@ -10,27 +10,40 @@ const { startCronJobs } = require("./cron/alertCron");
 
 const app = express();
 
-// Guaranteed CORS headers for all responses, including errors and preflight.
-app.use((req, res, next) => {
-  const origin = req.headers.origin || "*";
-  const reqHeaders = req.headers["access-control-request-headers"]
-    || "Origin, X-Requested-With, Content-Type, Accept, Authorization";
+const allowedOrigins = new Set(
+  [
+    ...(process.env.CLIENT_URL ? [process.env.CLIENT_URL] : []),
+    ...(process.env.ALLOWED_ORIGINS
+      ? process.env.ALLOWED_ORIGINS.split(",").map((value) => value.trim()).filter(Boolean)
+      : []),
+  ].filter(Boolean)
+);
 
-  res.setHeader("Access-Control-Allow-Origin", origin);
-  res.setHeader("Vary", "Origin");
-  res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", reqHeaders);
-  res.setHeader("Access-Control-Allow-Credentials", "false");
+const localhostRegex = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i;
+const renderOriginRegex = /^https:\/\/[a-z0-9-]+\.onrender\.com$/i;
 
-  if (req.method === "OPTIONS") {
-    return res.sendStatus(204);
+const isAllowedOrigin = (origin) => {
+  if (!origin) return true;
+  if (allowedOrigins.has(origin)) return true;
+
+  if (process.env.NODE_ENV !== "production" && localhostRegex.test(origin)) {
+    return true;
   }
 
-  return next();
-});
+  if (renderOriginRegex.test(origin)) {
+    return true;
+  }
+
+  return false;
+};
 
 const corsOptions = {
-  origin: "*",
+  origin(origin, callback) {
+    if (isAllowedOrigin(origin)) {
+      return callback(null, true);
+    }
+    return callback(new Error(`CORS blocked for origin: ${origin || "unknown"}`));
+  },
   credentials: false,
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   allowedHeaders: ["Origin", "X-Requested-With", "Content-Type", "Accept", "Authorization"],
@@ -41,6 +54,13 @@ const corsOptions = {
 app.use(helmet());
 app.use(cors(corsOptions));
 app.options("*", cors(corsOptions));
+
+app.use((err, req, res, next) => {
+  if (err && err.message && err.message.startsWith("CORS blocked")) {
+    return res.status(403).json({ message: "Origin is not allowed by CORS policy" });
+  }
+  return next(err);
+});
 
 // Rate limiting
 const limiter = rateLimit({
