@@ -33,6 +33,24 @@ const corsOptions = {
   optionsSuccessStatus: 204,
 };
 
+// Fail-safe CORS headers for browsers and Render preflight behavior.
+app.use((req, res, next) => {
+  const requestOrigin = req.headers.origin;
+  if (requestOrigin) {
+    res.header("Access-Control-Allow-Origin", requestOrigin);
+    res.header("Vary", "Origin");
+  }
+  res.header("Access-Control-Allow-Credentials", "true");
+  res.header("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
+  res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
+
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(204);
+  }
+
+  next();
+});
+
 // Security middleware
 app.use(helmet());
 app.use(cors(corsOptions));
