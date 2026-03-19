@@ -9,11 +9,24 @@ const { startCronJobs } = require("./cron/alertCron");
 
 const app = express();
 
+const normalizeOrigin = (origin) => origin?.trim().replace(/\/$/, "");
+const allowedOrigins = (process.env.CLIENT_URLS || process.env.CLIENT_URL || "http://localhost:5173")
+  .split(",")
+  .map(normalizeOrigin)
+  .filter(Boolean);
+
 // Security middleware
 app.use(helmet());
 app.use(
   cors({
-    origin: process.env.CLIENT_URL || "http://localhost:5173",
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true);
+      const normalized = normalizeOrigin(origin);
+      if (allowedOrigins.includes(normalized)) {
+        return callback(null, true);
+      }
+      return callback(new Error("Not allowed by CORS"));
+    },
     credentials: true,
   })
 );
