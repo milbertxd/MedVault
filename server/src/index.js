@@ -20,6 +20,7 @@ const corsOptions = {
   origin: (origin, callback) => {
     if (!origin) return callback(null, true);
     const normalized = normalizeOrigin(origin);
+
     if (
       allowedOrigins.includes(normalized)
       || renderOriginPattern.test(normalized)
@@ -27,29 +28,14 @@ const corsOptions = {
     ) {
       return callback(null, true);
     }
-    return callback(new Error(`Not allowed by CORS: ${normalized}`));
+
+    return callback(null, false);
   },
   credentials: true,
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Origin", "X-Requested-With", "Content-Type", "Accept", "Authorization"],
   optionsSuccessStatus: 204,
 };
-
-// Fail-safe CORS headers for browsers and Render preflight behavior.
-app.use((req, res, next) => {
-  const requestOrigin = req.headers.origin;
-  if (requestOrigin) {
-    res.header("Access-Control-Allow-Origin", requestOrigin);
-    res.header("Vary", "Origin");
-  }
-  res.header("Access-Control-Allow-Credentials", "true");
-  res.header("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
-  res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
-
-  if (req.method === "OPTIONS") {
-    return res.sendStatus(204);
-  }
-
-  next();
-});
 
 // Security middleware
 app.use(helmet());

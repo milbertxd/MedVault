@@ -12,9 +12,13 @@ const api = axios.create({
 // Request interceptor to add auth token
 api.interceptors.request.use(
   (config) => {
+    const url = config.url || "";
+    const isAuthEndpoint = url.includes("/auth/login") || url.includes("/auth/register");
     const token = localStorage.getItem("medvault_token");
-    if (token) {
+    if (token && !isAuthEndpoint) {
       config.headers.Authorization = `Bearer ${token}`;
+    } else if (isAuthEndpoint && config.headers.Authorization) {
+      delete config.headers.Authorization;
     }
     return config;
   },
@@ -38,8 +42,12 @@ api.interceptors.response.use(
 
 // Auth API
 export const authAPI = {
-  login: (data) => api.post("/auth/login", data),
-  register: (data) => api.post("/auth/register", data),
+  login: (data) => api.post("/auth/login", new URLSearchParams(data).toString(), {
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+  }),
+  register: (data) => api.post("/auth/register", new URLSearchParams(data).toString(), {
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+  }),
   getMe: () => api.get("/auth/me"),
   changePassword: (data) => api.put("/auth/change-password", data),
   getHealthCenters: () => api.get("/auth/health-centers"),
